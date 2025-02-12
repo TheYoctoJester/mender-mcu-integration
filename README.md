@@ -214,6 +214,58 @@ or
 west build -t run
 ```
 
+<<<<<<< HEAD
+=======
+### Embedded World 2025 demo
+
+The first demo setup iteration is based on the [ESP32-S3-DevKitC](https://docs.espressif.com/projects/esp-dev-kits/en/latest/esp32s3/esp32-s3-devkitc-1/user_guide.html#hardware-reference) + [W5500 for ethernet connectivity](https://www.reichelt.com/de/en/shop/product/developer_boards_-_spi-ethernet_interface_converter-305766) and a [64-count WS2812-type led strip](https://www.az-delivery.de/en/products/rgb-led-panel-ws2812b-16x16-256-leds-flexibel-led-modul-5050smd-ic-einzeladressierbare-vollfarbfunktionen-mit-dc5v-kompatibel-mit-raspberry-pi?_pos=3&_psq=ws&_ss=e&_v=1.0).
+
+Wiring:
+
+W5500:
+```
+- V   -> J1-Pin 1  / 3.3V
+- RES -> J1-Pin 5  / GPIO5
+- MI  -> J1-Pin 19 / GPIO13
+- INT -> J1-Pin 4  / GPIO4
+- CS  -> J1-Pin 16 / GPIO10
+- SCK -> J1-Pin 18 / GPIO12
+- MO  -> J1-Pin 17 / GPIO11
+- G   -> J3-Pin 1  / G
+```
+
+WS2812:
+```
+- V+  -> J1-Pin 21 / 5V
+- Vin -> J3-Pin 9  / GPIO39
+- V-  -> J1-Pin 22 / G
+````
+
+The configuration fragment `boards/shields/ew2025.conf` is prepared for this hardware setup. `CONFIG_MENDER_SERVER_TENANT_TOKEN` needs to be set according to actual setup.
+
+Build:
+```
+west build --board esp32s3_devkitc/esp32s3/procpu mender-mcu-integration -- -DEXTRA_DTC_OVERLAY_FILE=boards/shields/ew2025.overlay -DEXTRA_CONF_FILE=boards/shields/ew2025.conf
+```
+
+Flash it now to the board and read the serial line with something like:
+```
+west flash && west espressif monitor
+```
+
+## First time board setup
+
+For the first time of using the board, you need to build and flash the bootloader. It can either be
+done by:
+
+* Using `--sysbuild` option in your `west build`. Read the docs [here](https://docs.zephyrproject.org/latest/build/sysbuild/index.html).
+* Building and flashing the bootloader alone following [this guide](https://docs.mcuboot.com/readme-zephyr)
+
+Additionally, you might want to erase the whole flash so that the storage partition is clean. Use
+`python -m esptool --chip esp32 erase_flash` for that. Find the vendor documentation
+[here](https://docs.espressif.com/projects/esptool/en/latest/esp32/esptool/basic-commands.html#erase-flash-erase-flash-erase-region)
+
+>>>>>>> fe3dbd0 (feat: add first WIP state of EW2025 demo)
 ## Creating the Mender Artifact
 
 Create an Artifact (remember to disable compression):
