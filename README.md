@@ -214,11 +214,14 @@ or
 west build -t run
 ```
 
-<<<<<<< HEAD
-=======
 ### Embedded World 2025 demo
 
 The first demo setup iteration is based on the [ESP32-S3-DevKitC](https://docs.espressif.com/projects/esp-dev-kits/en/latest/esp32s3/esp32-s3-devkitc-1/user_guide.html#hardware-reference) + [W5500 for ethernet connectivity](https://www.reichelt.com/de/en/shop/product/developer_boards_-_spi-ethernet_interface_converter-305766) and a [64-count WS2812-type led strip](https://www.az-delivery.de/en/products/rgb-led-panel-ws2812b-16x16-256-leds-flexibel-led-modul-5050smd-ic-einzeladressierbare-vollfarbfunktionen-mit-dc5v-kompatibel-mit-raspberry-pi?_pos=3&_psq=ws&_ss=e&_v=1.0).
+
+First time setup to use the customized branch:
+```
+west init workspace --manifest-url https://github.com/theyoctojester/mender-mcu-integration --manifest-rev EW2025
+```
 
 Wiring:
 
@@ -265,7 +268,6 @@ Additionally, you might want to erase the whole flash so that the storage partit
 `python -m esptool --chip esp32 erase_flash` for that. Find the vendor documentation
 [here](https://docs.espressif.com/projects/esptool/en/latest/esp32/esptool/basic-commands.html#erase-flash-erase-flash-erase-region)
 
->>>>>>> fe3dbd0 (feat: add first WIP state of EW2025 demo)
 ## Creating the Mender Artifact
 
 Create an Artifact (remember to disable compression):

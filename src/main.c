@@ -21,8 +21,9 @@ LOG_MODULE_REGISTER(mender_app, LOG_LEVEL_DBG);
 #include <zephyr/kernel.h>
 #include <zephyr/sys/reboot.h>
 
-#include <mender/client.h>
-#include <mender/inventory.h>
+#include "mender-client.h"
+#include "mender-inventory.h"
+#include "mender-flash.h"
 
 #include <zephyr/kernel.h>
 #include <zephyr/drivers/led_strip.h>
@@ -39,13 +40,34 @@ LOG_MODULE_REGISTER(mender_app, LOG_LEVEL_DBG);
 
 #define RGB(_r, _g, _b) { .r = (_r), .g = (_g), .b = (_b) }
 
-static const struct led_rgb colors[] = {
-	RGB(0x0f, 0x00, 0x00), /* red */
-	RGB(0x00, 0x0f, 0x00), /* green */
-	RGB(0x00, 0x00, 0x0f), /* blue */
-};
+static const struct led_rgb R = RGB(0x0f, 0x00, 0x00);
+static const struct led_rgb G = RGB(0x00, 0x0f, 0x00);
+static const struct led_rgb B = RGB(0x00, 0x00, 0x0f);
+static const struct led_rgb Y = RGB(0x0f, 0x0f, 0x00);
 
-struct led_rgb pixels[STRIP_NUM_PIXELS];
+#if 0
+const struct led_rgb pixels[STRIP_NUM_PIXELS] = {
+    R, R, R, R, B, B, R, R,
+    R, R, R, B, B, B, R, R,
+    R, R, B, B, B, B, R, R,
+    R, B, B, R, B, B, R, R,
+    R, R, R, R, B, B, R, R,
+    R, R, R, R, B, B, R, R,
+    R, R, R, R, B, B, R, R,
+    R, R, R, R, B, B, R, R
+};
+#else
+const struct led_rgb pixels[STRIP_NUM_PIXELS] = {
+    Y, Y, Y, G, G, Y, Y, Y,
+    Y, Y, G, G, G, G, Y, Y,
+    Y, G, G, Y, Y, G, G, Y,
+    Y, Y, Y, Y, Y, G, G, Y,
+    Y, Y, Y, Y, G, G, Y, Y,
+    Y, Y, Y, G, G, Y, Y, Y,
+    Y, G, G, G, G, G, G, Y,
+    Y, G, G, G, G, G, G, Y,
+};
+#endif
 
 static const struct device *const strip = DEVICE_DT_GET(STRIP_NODE);
 
@@ -70,7 +92,7 @@ network_release_cb(void) {
 }
 
 static mender_err_t
-deployment_status_cb(mender_deployment_status_t status, const char *desc) {
+deployment_status_cb(mender_deployment_status_t status, char *desc) {
     LOG_DBG("deployment_status_cb: %s", desc);
     return MENDER_OK;
 }
@@ -99,7 +121,6 @@ get_identity_cb(const mender_identity_t **identity) {
 
 int
 main(void) {
-	size_t cursor = 0, color = 0;
 	int rc;
 
     printf("Hello World! %s\n", CONFIG_BOARD_TARGET);
@@ -174,26 +195,12 @@ END:
     }
 
 	LOG_INF("Displaying pattern on strip");
-	while (1) {
-		memset(&pixels, 0x00, sizeof(pixels));
-		memcpy(&pixels[cursor], &colors[color], sizeof(struct led_rgb));
-		rc = led_strip_update_rgb(strip, pixels, STRIP_NUM_PIXELS);
-
-		if (rc) {
-			LOG_ERR("couldn't update strip: %d", rc);
-		}
-
-		cursor++;
-		if (cursor >= STRIP_NUM_PIXELS) {
-			cursor = 0;
-			color++;
-			if (color == ARRAY_SIZE(colors)) {
-				color = 0;
-			}
-		}
-
-		k_sleep(DELAY_TIME);
+	rc = led_strip_update_rgb(strip, pixels, STRIP_NUM_PIXELS);
+    if (rc) {
+        LOG_ERR("couldn't update strip: %d", rc);
     }
+
+	k_sleep(K_FOREVER);
 
     return 0;
 }
