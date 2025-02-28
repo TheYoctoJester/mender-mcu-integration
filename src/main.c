@@ -21,9 +21,8 @@ LOG_MODULE_REGISTER(mender_app, LOG_LEVEL_DBG);
 #include <zephyr/kernel.h>
 #include <zephyr/sys/reboot.h>
 
-#include "mender-client.h"
-#include "mender-inventory.h"
-#include "mender-flash.h"
+#include "mender/client.h"
+#include "mender/inventory.h"
 
 #include <zephyr/kernel.h>
 #include <zephyr/drivers/led_strip.h>
@@ -36,36 +35,100 @@ LOG_MODULE_REGISTER(mender_app, LOG_LEVEL_DBG);
 #define STRIP_NODE		DT_ALIAS(led_strip)
 #define STRIP_NUM_PIXELS	DT_PROP(DT_ALIAS(led_strip), chain_length)
 
-#define DELAY_TIME K_MSEC(50)
+#define SLEEP_TIME_MS 1000
 
 #define RGB(_r, _g, _b) { .r = (_r), .g = (_g), .b = (_b) }
 
+static const struct led_rgb O = RGB(0x00, 0x00, 0x00);
+static const struct led_rgb W = RGB(0xff, 0xff, 0xff);
+static const struct led_rgb M = RGB(0x80, 0x80, 0x80);
 static const struct led_rgb R = RGB(0x0f, 0x00, 0x00);
 static const struct led_rgb G = RGB(0x00, 0x0f, 0x00);
 static const struct led_rgb B = RGB(0x00, 0x00, 0x0f);
 static const struct led_rgb Y = RGB(0x0f, 0x0f, 0x00);
 
+const struct led_rgb pixels_off[STRIP_NUM_PIXELS] = {
+    O, O, O, O, O, O, O, O,
+    O, O, O, O, O, O, O, O,
+    O, O, O, O, O, O, O, O,
+    O, O, O, O, O, O, O, O,
+    O, O, O, O, O, O, O, O,
+    O, O, O, O, O, O, O, O,
+    O, O, O, O, O, O, O, O,
+    O, O, O, O, O, O, O, O
+};
+
+const struct led_rgb pixels_boot[STRIP_NUM_PIXELS] = {
+    O, O, O, O, O, O, O, O,
+    O, O, O, W, W, O, O, O,
+    O, O, W, O, O, W, O, O,
+    O, W, O, O, O, O, W, O,
+    O, W, O, O, O, O, W, O,
+    O, O, W, O, O, W, O, O,
+    O, O, O, W, W, O, O, O,
+    O, O, O, O, O, O, O, O
+};
+
 #if 0
-const struct led_rgb pixels[STRIP_NUM_PIXELS] = {
-    R, R, R, R, B, B, R, R,
-    R, R, R, B, B, B, R, R,
-    R, R, B, B, B, B, R, R,
-    R, B, B, R, B, B, R, R,
-    R, R, R, R, B, B, R, R,
-    R, R, R, R, B, B, R, R,
-    R, R, R, R, B, B, R, R,
-    R, R, R, R, B, B, R, R
+const struct led_rgb pixels_payload_template[STRIP_NUM_PIXELS] = {
+    W, W, Y, Y, Y, Y, W, W,
+    W, Y, Y, Y, Y, Y, Y, W,
+    Y, Y, Y, Y, Y, Y, Y, Y,
+    Y, Y, Y, Y, Y, Y, Y, Y,
+    Y, Y, Y, Y, Y, Y, Y, Y,
+    Y, Y, Y, Y, Y, Y, Y, Y,
+    W, Y, Y, Y, Y, Y, Y, W,
+    W, W, Y, Y, Y, Y, W, W
+};
+#endif
+
+#ifndef EW_VERSION
+#define EW_VERSION 1
+#endif
+
+#if EW_VERSION == 1
+const struct led_rgb pixels_payload1[STRIP_NUM_PIXELS] = {
+    O, O, Y, Y, Y, Y, O, O,
+    O, Y, Y, Y, Y, Y, Y, O,
+    Y, Y, W, Y, Y, W, Y, Y,
+    Y, Y, W, Y, Y, W, Y, Y,
+    Y, Y, Y, Y, Y, Y, Y, Y,
+    Y, Y, R, Y, Y, R, Y, Y,
+    O, Y, Y, R, R, Y, Y, O,
+    O, O, Y, Y, Y, Y, O, O
+};
+
+const struct led_rgb pixels_payload2[STRIP_NUM_PIXELS] = {
+    O, O, Y, Y, Y, Y, O, O,
+    O, Y, Y, Y, Y, Y, Y, O,
+    Y, Y, W, Y, Y, W, Y, Y,
+    Y, Y, W, Y, Y, W, Y, Y,
+    Y, Y, Y, Y, Y, Y, Y, Y,
+    Y, Y, R, Y, Y, R, Y, Y,
+    O, Y, Y, R, R, Y, Y, O,
+    O, O, Y, Y, Y, Y, O, O
 };
 #else
-const struct led_rgb pixels[STRIP_NUM_PIXELS] = {
-    Y, Y, Y, G, G, Y, Y, Y,
-    Y, Y, G, G, G, G, Y, Y,
-    Y, G, G, Y, Y, G, G, Y,
-    Y, Y, Y, Y, Y, G, G, Y,
-    Y, Y, Y, Y, G, G, Y, Y,
-    Y, Y, Y, G, G, Y, Y, Y,
-    Y, G, G, G, G, G, G, Y,
-    Y, G, G, G, G, G, G, Y,
+const struct led_rgb pixels_payload1[STRIP_NUM_PIXELS] = {
+    O, O, Y, Y, Y, Y, O, O,
+    O, Y, Y, Y, Y, Y, Y, O,
+    Y, Y, W, Y, Y, W, Y, Y,
+    Y, Y, W, Y, Y, W, Y, Y,
+    Y, Y, Y, Y, Y, Y, Y, Y,
+    Y, Y, Y, O, O, Y, Y, Y,
+    O, Y, O, Y, Y, O, Y, O,
+    O, O, Y, Y, Y, Y, O, O
+};
+
+const struct led_rgb pixels_payload2[STRIP_NUM_PIXELS] = {
+    R, R, Y, Y, Y, Y, R, R,
+    R, Y, Y, Y, Y, Y, Y, R,
+    Y, Y, W, Y, Y, W, Y, Y,
+    Y, Y, W, Y, Y, W, Y, Y,
+    Y, Y, Y, Y, Y, Y, Y, Y,
+    Y, Y, Y, O, O, Y, Y, Y,
+    R, Y, O, Y, Y, O, Y, R,
+    R, R, Y, Y, Y, Y, R, R
 };
 #endif
 
@@ -119,11 +182,34 @@ get_identity_cb(const mender_identity_t **identity) {
     return MENDER_FAIL;
 }
 
+static void
+set_leds(const struct led_rgb data[]) {
+	int rc;
+    rc = led_strip_update_rgb(strip, data, STRIP_NUM_PIXELS);
+    if (rc) {
+        LOG_ERR("couldn't update strip: %d", rc);
+    }
+}
+
 int
 main(void) {
-	int rc;
+    int led_ready = 0;
+    int toggle = 0;
 
-    printf("Hello World! %s\n", CONFIG_BOARD_TARGET);
+    printf("Initializing LEDs %s\n", CONFIG_BOARD_TARGET);
+    if (device_is_ready(strip)) {
+        led_ready = 1;
+        LOG_INF("Found LED strip device %s", strip->name);
+    } else {
+        LOG_ERR("LED strip device %s is not ready", strip->name);
+    }
+
+    if (led_ready) {
+        LOG_INF("Clearing LEDs");
+        set_leds(pixels_off);
+        LOG_INF("Setting LEDs");
+        set_leds(pixels_boot);
+    }
 
     netup_wait_for_network();
 
@@ -168,9 +254,8 @@ main(void) {
 
 #ifdef CONFIG_MENDER_CLIENT_INVENTORY
     mender_keystore_t inventory[] = {
-	    { .name = "demo", .value = "demo" },
-	    { .name = "foo", .value = "bar" },
-	    { .name = "tyj", .value = "2" },
+	    { .name = "event", .value = "Embedded World 2025" },
+	    { .name = "version", .value = STRINGIFY(EW_VERSION) },
 	    { .name = NULL, .value = NULL } };
     if (MENDER_OK != mender_inventory_set(inventory)) {
         LOG_ERR("Failed to set the inventory");
@@ -187,19 +272,17 @@ main(void) {
     LOG_INF("Mender client activated and running!");
 
 END:
-   	if (device_is_ready(strip)) {
-		LOG_INF("Found LED strip device %s", strip->name);
-	} else {
-		LOG_ERR("LED strip device %s is not ready", strip->name);
-		return 0;
+    while (1) {
+        if (toggle) {
+            toggle = 0;
+            set_leds(pixels_payload1);
+        }
+        else {
+            toggle = 1;
+            set_leds(pixels_payload2);
+        }
+		k_msleep(SLEEP_TIME_MS);
     }
-
-	LOG_INF("Displaying pattern on strip");
-	rc = led_strip_update_rgb(strip, pixels, STRIP_NUM_PIXELS);
-    if (rc) {
-        LOG_ERR("couldn't update strip: %d", rc);
-    }
-
 	k_sleep(K_FOREVER);
 
     return 0;
