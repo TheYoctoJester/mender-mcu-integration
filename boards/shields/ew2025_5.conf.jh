@@ -1,0 +1,22 @@
+####################################
+# W5500 Ethernet
+####################################
+CONFIG_WIFI=n
+
+CONFIG_SPI=y
+CONFIG_NET_L2_ETHERNET=y
+CONFIG_ETH_W5500=y
+CONFIG_ETH_W5500_TIMEOUT=1000
+CONFIG_NET_MGMT=y
+
+CONFIG_MENDER_DEVICE_TYPE="Mender_MCU_EW2025_5"
+CONFIG_MENDER_SERVER_TENANT_TOKEN="2aSeaRzJLE8r6ihkbRcg8rweNQmyea2_IjcEIGmvyZ0"
+CONFIG_MENDER_SERVER_HOST="https://hosted.mender.io"
+CONFIG_MENDER_SCHEDULER_SEPARATE_WORK_QUEUE=n
+
+CONFIG_LED_STRIP=y
+CONFIG_WS2812_STRIP_SPI=y
+
+# HM account
+# email: josef.holzmayr+ew2025@northern.tech
+# password: EmbeddedWorld2025

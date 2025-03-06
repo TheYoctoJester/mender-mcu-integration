@@ -1,0 +1,51 @@
+/* This overlay is based on ARCELI W5500 ETH,
+ * changing the pinout for the WIZNet produced shield.
+ *
+ * See schematic at:
+ * https://docs.wiznet.io/Product/Open-Source-Hardware/w5500_ethernet_shield#technical-reference
+ */
+
+#include <zephyr/dt-bindings/led/led.h>
+
+&spi2 {
+	status = "okay";
+
+	eth_w5500: eth_w5500@0 {
+        compatible = "wiznet,w5500";
+		reg = <0x0>;
+        spi-max-frequency = <8000000>;
+		int-gpios = <&gpio0 4 GPIO_ACTIVE_LOW>;
+		reset-gpios = <&gpio0 5 GPIO_ACTIVE_LOW>;
+
+        local-mac-address = [00 08 DC 01 02 05];
+		status = "okay";
+	};
+};
+
+&spi3 {
+	/* Workaround to support WS2812 driver */
+	line-idle-low;
+	status = "okay";
+
+	led_strip: ws2812@0 {
+		compatible = "worldsemi,ws2812-spi";
+		status = "okay";
+
+		reg = <0>;
+		spi-max-frequency = <6400000>;
+
+		chain-length = <64>;
+		spi-cpha;
+		spi-one-frame = <0xf0>;
+		spi-zero-frame = <0xc0>;
+		color-mapping = <LED_COLOR_ID_GREEN
+							LED_COLOR_ID_RED
+							LED_COLOR_ID_BLUE>;
+	};
+};
+
+/ {
+	aliases {
+			led-strip = &led_strip;
+	};
+};
