@@ -21,10 +21,16 @@ LOG_MODULE_REGISTER(mender_app, LOG_LEVEL_DBG);
 
 #include <zephyr/kernel.h>
 #include <zephyr/sys/reboot.h>
+#include <zephyr/version.h>
 
 #include <mender/utils.h>
 #include <mender/client.h>
 #include <mender/inventory.h>
+
+#ifdef CONFIG_DISPLAY
+#include <zephyr/drivers/display.h>
+#include "mender_logo.h"
+#endif
 
 #ifdef BUILD_INTEGRATION_TESTS
 #include "modules/test-update-module.h"
@@ -85,15 +91,76 @@ mender_get_identity_cb(const mender_identity_t **identity) {
 
 static mender_err_t
 persistent_inventory_cb(mender_keystore_t **keystore, uint8_t *keystore_len) {
-    static mender_keystore_t inventory[] = { { .name = "App", .value = "mender-mcu-integration" } };
+    static mender_keystore_t inventory[] = {
+        { .name = "App", .value = "mender-mcu-integration" },
+        { .name = "Network", .value = "W5500-Ethernet" },
+        { .name = "Display", .value = "ILI9341-320x240" }
+    };
     *keystore                            = inventory;
-    *keystore_len                        = 1;
+    *keystore_len                        = 3;
     return MENDER_OK;
 }
 
+#ifdef CONFIG_DISPLAY
+static void display_logo(void)
+{
+    const struct device *display_dev = DEVICE_DT_GET(DT_CHOSEN(zephyr_display));
+    struct display_capabilities caps;
+    struct display_buffer_descriptor desc;
+
+    if (!device_is_ready(display_dev)) {
+        LOG_ERR("Display device not ready");
+        return;
+    }
+
+    LOG_INF("Display device: %s", display_dev->name);
+
+    display_get_capabilities(display_dev, &caps);
+    LOG_INF("Display: %dx%d, pixel format: %d",
+            caps.x_resolution, caps.y_resolution,
+            caps.current_pixel_format);
+
+    /* Fill background with white - write full rows at a time for speed */
+    static uint16_t white_row[320];
+    for (size_t i = 0; i < caps.x_resolution && i < 320; i++) {
+        white_row[i] = 0xFFFF;
+    }
+    desc.buf_size = caps.x_resolution * 2;
+    desc.pitch = caps.x_resolution;
+    desc.width = caps.x_resolution;
+    desc.height = 1;
+
+    for (size_t y = 0; y < caps.y_resolution; y++) {
+        display_write(display_dev, 0, y, &desc, white_row);
+    }
+
+    /* Calculate centered position for logo */
+    size_t x_offset = (caps.x_resolution - MENDER_LOGO_WIDTH) / 2;
+    size_t y_offset = (caps.y_resolution - MENDER_LOGO_HEIGHT) / 2;
+
+    /* Draw logo line by line */
+    desc.buf_size = MENDER_LOGO_WIDTH * 2;
+    desc.pitch = MENDER_LOGO_WIDTH;
+    desc.width = MENDER_LOGO_WIDTH;
+    desc.height = 1;
+
+    for (size_t y = 0; y < MENDER_LOGO_HEIGHT; y++) {
+        display_write(display_dev, x_offset, y_offset + y, &desc,
+                      &mender_logo_rgb565[y * MENDER_LOGO_WIDTH]);
+    }
+
+    display_blanking_off(display_dev);
+    LOG_INF("Mender logo displayed");
+}
+#endif
+
 int
 main(void) {
-    printf("Hello World! %s\n", CONFIG_BOARD_TARGET);
+    LOG_INF("Mender MCU Integration on Zephyr %s", KERNEL_VERSION_STRING);
+
+#ifdef CONFIG_DISPLAY
+    display_logo();
+#endif
 
     netup_wait_for_network();
 

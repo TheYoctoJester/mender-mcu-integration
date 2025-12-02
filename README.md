@@ -21,6 +21,48 @@ Zephyr Module, with configurations for some boards to choose from.
 
 To get started with Mender for Microcontrollers, visit [Mender documentation](https://docs.mender.io/get-started/microcontroller-preview).
 
+### ESP32-S3-DevKitC with W5500 Ethernet and ILI9341 Display
+
+This setup uses [ESP32-S3-DevKitC](https://docs.espressif.com/projects/esp-dev-kits/en/latest/esp32s3/esp32-s3-devkitc-1/user_guide.html#hardware-reference) with [W5500 Ethernet](https://www.reichelt.com/de/en/shop/product/developer_boards_-_spi-ethernet_interface_converter-305766) and [Adafruit 3.2" TFT Display (ILI9341)](https://www.adafruit.com/product/1743).
+
+The W5500 and display use separate SPI buses (SPI2 and SPI3) because W5500 requires hardware CS.
+
+#### Wiring
+
+**W5500 Ethernet (SPI2):**
+| Signal | ESP32-S3 GPIO |
+|--------|---------------|
+| SCLK   | GPIO12        |
+| MOSI   | GPIO11        |
+| MISO   | GPIO13        |
+| CS     | GPIO10        |
+| INT    | GPIO4         |
+| RESET  | GPIO5         |
+| VCC    | 3.3V          |
+| GND    | GND           |
+
+**ILI9341 Display (SPI3):**
+| Signal | ESP32-S3 GPIO |
+|--------|---------------|
+| CLK    | GPIO36        |
+| MOSI   | GPIO39        |
+| CS     | GPIO15        |
+| D/C    | GPIO14        |
+| RST    | GPIO21        |
+| Vin    | 3.3V          |
+| GND    | GND           |
+| Lite   | 3.3V          |
+
+See [docs/display-wiring.md](docs/display-wiring.md) for detailed wiring and configuration.
+
+#### Build and Flash
+
+```
+west build --sysbuild --board esp32s3_devkitc/esp32s3/procpu mender-mcu-integration -- \
+  -DCONFIG_MENDER_SERVER_TENANT_TOKEN=\"$TENANT_TOKEN\"
+west flash && west espressif monitor
+```
+
 ### Native simulator
 
 See board support information from [Zephyr Project

@@ -1,5 +1,53 @@
-&wifi {
+#include <zephyr/dt-bindings/display/ili9xxx.h>
+
+/* W5500 Ethernet on SPI2 - uses hardware CS (GPIO10) */
+&spi2 {
 	status = "okay";
+
+	eth_w5500: eth_w5500@0 {
+		compatible = "wiznet,w5500";
+		reg = <0x0>;
+		spi-max-frequency = <8000000>;
+		int-gpios = <&gpio0 4 GPIO_ACTIVE_LOW>;
+		reset-gpios = <&gpio0 5 GPIO_ACTIVE_LOW>;
+
+		/* Set your MAC address here */
+		local-mac-address = [00 08 DC 01 02 03];
+		status = "okay";
+	};
+};
+
+/* ILI9341 Display on SPI3 */
+&spi3 {
+	status = "okay";
+	cs-gpios = <&gpio0 15 GPIO_ACTIVE_LOW>;  /* ILI9341 CS */
+};
+
+/ {
+	chosen {
+		zephyr,display = &ili9341;
+	};
+
+	/* MIPI-DBI controller for ILI9341 on SPI3 */
+	mipi_dbi {
+		compatible = "zephyr,mipi-dbi-spi";
+		spi-dev = <&spi3>;
+		dc-gpios = <&gpio0 14 GPIO_ACTIVE_HIGH>;
+		reset-gpios = <&gpio0 21 GPIO_ACTIVE_LOW>;
+		write-only;
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		ili9341: ili9341@0 {
+			compatible = "ilitek,ili9341";
+			reg = <0>;
+			mipi-max-frequency = <15000000>;
+			width = <320>;
+			height = <240>;
+			pixel-format = <ILI9XXX_PIXEL_FORMAT_RGB565>;
+			rotation = <90>;
+		};
+	};
 };
 
 &flash0 {
