@@ -33,6 +33,7 @@ LOG_MODULE_REGISTER(mender_app, LOG_LEVEL_DBG);
 #include <zephyr/drivers/display.h>
 #endif
 
+
 #define SLEEP_TIME_MS 1000
 
 #ifndef EW_VERSION
