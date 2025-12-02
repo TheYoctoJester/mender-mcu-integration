@@ -214,45 +214,45 @@ or
 west build -t run
 ```
 
-### Embedded World 2025 demo
+### ESP32-S3-DevKitC with W5500 Ethernet and ILI9341 Display
 
-The first demo setup iteration is based on the [ESP32-S3-DevKitC](https://docs.espressif.com/projects/esp-dev-kits/en/latest/esp32s3/esp32-s3-devkitc-1/user_guide.html#hardware-reference) + [W5500 for ethernet connectivity](https://www.reichelt.com/de/en/shop/product/developer_boards_-_spi-ethernet_interface_converter-305766) and a [64-count WS2812-type led strip](https://www.az-delivery.de/en/products/rgb-led-panel-ws2812b-16x16-256-leds-flexibel-led-modul-5050smd-ic-einzeladressierbare-vollfarbfunktionen-mit-dc5v-kompatibel-mit-raspberry-pi?_pos=3&_psq=ws&_ss=e&_v=1.0).
+This setup uses [ESP32-S3-DevKitC](https://docs.espressif.com/projects/esp-dev-kits/en/latest/esp32s3/esp32-s3-devkitc-1/user_guide.html#hardware-reference) with [W5500 Ethernet](https://www.reichelt.com/de/en/shop/product/developer_boards_-_spi-ethernet_interface_converter-305766) and [Adafruit 3.2" TFT Display (ILI9341)](https://www.adafruit.com/product/1743).
 
-First time setup to use the customized branch:
-```
-west init workspace --manifest-url https://github.com/theyoctojester/mender-mcu-integration --manifest-rev EW2025
-```
+The W5500 and display use separate SPI buses (SPI2 and SPI3) because W5500 requires hardware CS.
 
-Wiring:
+#### Wiring
 
-W5500:
-```
-- V   -> J1-Pin 1  / 3.3V
-- RES -> J1-Pin 5  / GPIO5
-- MI  -> J1-Pin 19 / GPIO13
-- INT -> J1-Pin 4  / GPIO4
-- CS  -> J1-Pin 16 / GPIO10
-- SCK -> J1-Pin 18 / GPIO12
-- MO  -> J1-Pin 17 / GPIO11
-- G   -> J3-Pin 1  / G
-```
+**W5500 Ethernet (SPI2):**
+| Signal | ESP32-S3 GPIO |
+|--------|---------------|
+| SCLK   | GPIO12        |
+| MOSI   | GPIO11        |
+| MISO   | GPIO13        |
+| CS     | GPIO10        |
+| INT    | GPIO4         |
+| RESET  | GPIO5         |
+| VCC    | 3.3V          |
+| GND    | GND           |
 
-WS2812:
-```
-- V+  -> J1-Pin 21 / 5V
-- Vin -> J3-Pin 9  / GPIO39
-- V-  -> J1-Pin 22 / G
-````
+**ILI9341 Display (SPI3):**
+| Signal | ESP32-S3 GPIO |
+|--------|---------------|
+| CLK    | GPIO36        |
+| MOSI   | GPIO39        |
+| CS     | GPIO15        |
+| D/C    | GPIO14        |
+| RST    | GPIO21        |
+| Vin    | 3.3V          |
+| GND    | GND           |
+| Lite   | 3.3V          |
 
-The configuration fragment `boards/shields/ew2025.conf` is prepared for this hardware setup. `CONFIG_MENDER_SERVER_TENANT_TOKEN` needs to be set according to actual setup.
+See [docs/display-wiring.md](docs/display-wiring.md) for detailed wiring and configuration.
 
-Build:
-```
-west build --board esp32s3_devkitc/esp32s3/procpu mender-mcu-integration -- -DEXTRA_DTC_OVERLAY_FILE=boards/shields/ew2025.overlay -DEXTRA_CONF_FILE=boards/shields/ew2025.conf
-```
+#### Build and Flash
 
-Flash it now to the board and read the serial line with something like:
 ```
+west build --sysbuild --board esp32s3_devkitc/esp32s3/procpu mender-mcu-integration -- \
+  -DCONFIG_MENDER_SERVER_TENANT_TOKEN=\"$TENANT_TOKEN\"
 west flash && west espressif monitor
 ```
 
