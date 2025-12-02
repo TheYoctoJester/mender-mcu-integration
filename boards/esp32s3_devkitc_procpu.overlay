@@ -1,6 +1,6 @@
-#include <zephyr/dt-bindings/led/led.h>
+#include <zephyr/dt-bindings/display/ili9xxx.h>
 
-/* W5500 Ethernet on SPI2 */
+/* W5500 Ethernet on SPI2 - uses hardware CS (GPIO10) */
 &spi2 {
 	status = "okay";
 
@@ -17,26 +17,35 @@
 	};
 };
 
-/* Stub LED strip on SPI3 (main.c requires led-strip alias) */
+/* ILI9341 Display on SPI3 */
 &spi3 {
-	line-idle-low;
 	status = "okay";
-
-	led_strip: ws2812@0 {
-		compatible = "worldsemi,ws2812-spi";
-		status = "okay";
-		reg = <0>;
-		spi-max-frequency = <6400000>;
-		chain-length = <64>;
-		spi-cpha;
-		spi-one-frame = <0xf0>;
-		spi-zero-frame = <0xc0>;
-		color-mapping = <LED_COLOR_ID_GREEN LED_COLOR_ID_RED LED_COLOR_ID_BLUE>;
-	};
+	cs-gpios = <&gpio0 15 GPIO_ACTIVE_LOW>;  /* ILI9341 CS */
 };
 
 / {
-	aliases {
-		led-strip = &led_strip;
+	chosen {
+		zephyr,display = &ili9341;
+	};
+
+	/* MIPI-DBI controller for ILI9341 on SPI3 */
+	mipi_dbi {
+		compatible = "zephyr,mipi-dbi-spi";
+		spi-dev = <&spi3>;
+		dc-gpios = <&gpio0 14 GPIO_ACTIVE_HIGH>;
+		reset-gpios = <&gpio0 21 GPIO_ACTIVE_LOW>;
+		write-only;
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		ili9341: ili9341@0 {
+			compatible = "ilitek,ili9341";
+			reg = <0>;
+			mipi-max-frequency = <15000000>;
+			width = <320>;
+			height = <240>;
+			pixel-format = <ILI9XXX_PIXEL_FORMAT_RGB565>;
+			rotation = <90>;
+		};
 	};
 };

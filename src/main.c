@@ -25,106 +25,19 @@ LOG_MODULE_REGISTER(mender_app, LOG_LEVEL_DBG);
 #include "mender/inventory.h"
 
 #include <zephyr/kernel.h>
-#include <zephyr/drivers/led_strip.h>
 #include <zephyr/device.h>
 #include <zephyr/drivers/spi.h>
 #include <zephyr/sys/util.h>
 
-// based on https://github.com/nrfconnect/sdk-zephyr/tree/v3.5.99-ncs1-1/samples/drivers/led_ws2812
-
-#define STRIP_NODE		DT_ALIAS(led_strip)
-#define STRIP_NUM_PIXELS	DT_PROP(DT_ALIAS(led_strip), chain_length)
+#ifdef CONFIG_DISPLAY
+#include <zephyr/drivers/display.h>
+#endif
 
 #define SLEEP_TIME_MS 1000
-
-#define RGB(_r, _g, _b) { .r = (_r), .g = (_g), .b = (_b) }
-
-static const struct led_rgb O = RGB(0x00, 0x00, 0x00);
-static const struct led_rgb W = RGB(0xff, 0xff, 0xff);
-static const struct led_rgb M = RGB(0x80, 0x80, 0x80);
-static const struct led_rgb R = RGB(0x0f, 0x00, 0x00);
-static const struct led_rgb G = RGB(0x00, 0x0f, 0x00);
-static const struct led_rgb B = RGB(0x00, 0x00, 0x0f);
-static const struct led_rgb Y = RGB(0x0f, 0x0f, 0x00);
-
-const struct led_rgb pixels_off[STRIP_NUM_PIXELS] = {
-    O, O, O, O, O, O, O, O,
-    O, O, O, O, O, O, O, O,
-    O, O, O, O, O, O, O, O,
-    O, O, O, O, O, O, O, O,
-    O, O, O, O, O, O, O, O,
-    O, O, O, O, O, O, O, O,
-    O, O, O, O, O, O, O, O,
-    O, O, O, O, O, O, O, O
-};
-
-const struct led_rgb pixels_boot[STRIP_NUM_PIXELS] = {
-    O, O, O, O, O, O, O, O,
-    O, O, O, W, W, O, O, O,
-    O, O, W, O, O, W, O, O,
-    O, W, O, O, O, O, W, O,
-    O, W, O, O, O, O, W, O,
-    O, O, W, O, O, W, O, O,
-    O, O, O, W, W, O, O, O,
-    O, O, O, O, O, O, O, O
-};
-
 
 #ifndef EW_VERSION
 #define EW_VERSION 1
 #endif
-
-#if EW_VERSION == 1
-
-const struct led_rgb pixels_payload1[STRIP_NUM_PIXELS] = {
-    O, O, Y, Y, Y, Y, O, O,
-    O, Y, Y, Y, Y, Y, Y, O,
-    Y, Y, R, Y, W, W, Y, Y,
-    Y, R, Y, Y, Y, Y, Y, Y,
-    Y, R, Y, Y, Y, Y, Y, Y,
-    Y, Y, R, Y, W, W, Y, Y,
-    O, Y, Y, Y, Y, Y, Y, O,
-    O, O, Y, Y, Y, Y, O, O
-};
-
-const struct led_rgb pixels_payload2[STRIP_NUM_PIXELS] = {
-    O, O, Y, Y, Y, Y, O, O,
-    O, Y, Y, Y, Y, Y, Y, O,
-    Y, Y, R, Y, W, W, Y, Y,
-    Y, R, Y, Y, Y, Y, Y, Y,
-    Y, R, Y, Y, Y, Y, Y, Y,
-    Y, Y, R, Y, W, W, Y, Y,
-    O, Y, Y, Y, Y, Y, Y, O,
-    O, O, Y, Y, Y, Y, O, O
-};
-
-#else
-
-const struct led_rgb pixels_payload1[STRIP_NUM_PIXELS] = {
-    O, O, Y, Y, Y, Y, O, O,
-    O, Y, Y, Y, Y, Y, Y, O,
-    Y, O, Y, Y, W, W, Y, Y,
-    Y, Y, O, Y, Y, Y, Y, Y,
-    Y, Y, O, Y, Y, Y, Y, Y,
-    Y, O, Y, Y, W, W, Y, Y,
-    O, Y, Y, Y, Y, Y, Y, O,
-    O, O, Y, Y, Y, Y, O, O
-};
-
-const struct led_rgb pixels_payload2[STRIP_NUM_PIXELS] = {
-    R, R, Y, Y, Y, Y, R, R,
-    R, Y, Y, Y, Y, Y, Y, R,
-    Y, O, Y, Y, W, W, Y, Y,
-    Y, Y, O, Y, Y, Y, Y, Y,
-    Y, Y, O, Y, Y, Y, Y, Y,
-    Y, O, Y, Y, W, W, Y, Y,
-    R, Y, Y, Y, Y, Y, Y, R,
-    R, R, Y, Y, Y, Y, R, R
-};
-
-#endif
-
-static const struct device *const strip = DEVICE_DT_GET(STRIP_NODE);
 
 #ifdef CONFIG_MENDER_ZEPHYR_IMAGE_UPDATE_MODULE
 #include <mender/zephyr-image-update-module.h>
@@ -174,34 +87,66 @@ get_identity_cb(const mender_identity_t **identity) {
     return MENDER_FAIL;
 }
 
-static void set_leds(const struct led_rgb data[]) {
-	int rc = led_strip_update_rgb(strip, data, STRIP_NUM_PIXELS);
-    if (rc) {
-        LOG_ERR("couldn't update strip: %d", rc);
+#ifdef CONFIG_DISPLAY
+static void test_display(void)
+{
+    const struct device *display_dev = DEVICE_DT_GET(DT_CHOSEN(zephyr_display));
+    struct display_capabilities caps;
+    struct display_buffer_descriptor buf_desc;
+    uint16_t color;
+    uint8_t *buf;
+
+    if (!device_is_ready(display_dev)) {
+        LOG_ERR("Display device not ready");
+        return;
     }
+
+    LOG_INF("Display device: %s", display_dev->name);
+
+    display_get_capabilities(display_dev, &caps);
+    LOG_INF("Display: %dx%d, pixel_format=%d", caps.x_resolution, caps.y_resolution, caps.current_pixel_format);
+
+    /* Fill with red color (RGB565: 0xF800) */
+    buf_desc.width = caps.x_resolution;
+    buf_desc.height = 10;  /* Draw 10 lines at a time */
+    buf_desc.pitch = caps.x_resolution;
+    buf_desc.buf_size = buf_desc.width * buf_desc.height * 2; /* RGB565 = 2 bytes */
+
+    buf = k_malloc(buf_desc.buf_size);
+    if (!buf) {
+        LOG_ERR("Failed to allocate display buffer");
+        return;
+    }
+
+    /* Red on this display: color mapping is R->B, G->R, B->G, so send green for red */
+    color = 0x07E0;
+    for (size_t i = 0; i < buf_desc.buf_size / 2; i++) {
+        ((uint16_t *)buf)[i] = color;
+    }
+
+    LOG_INF("Drawing red rectangle on display...");
+    for (int y = 0; y < caps.y_resolution; y += buf_desc.height) {
+        display_write(display_dev, 0, y, &buf_desc, buf);
+    }
+
+    k_free(buf);
+
+    display_blanking_off(display_dev);
+    LOG_INF("Display test complete - should show red screen");
 }
+#endif
 
 int
 main(void) {
-    int led_ready = 0;
-    int toggle = 0;
 
+#ifdef CONFIG_DISPLAY
+    LOG_INF("Testing display BEFORE network init...");
+    test_display();
+    LOG_INF("Display test done, waiting 3 seconds...");
+    k_msleep(3000);
+#endif
 
-    if (device_is_ready(strip)) {
-		LOG_INF("Found LED strip device %s", strip->name);
-        led_ready = 1;
-	} else {
-		LOG_ERR("LED strip device %s is not ready", strip->name);
-		goto END;
-    }
-
-    if (led_ready) {
-		LOG_INF("Clearing LEDS...");
-        set_leds(pixels_off);
-		LOG_INF(".. setting startup LEDS.");
-        set_leds(pixels_boot);
-    }
-
+    LOG_INF("Now initializing network...");
     netup_wait_for_network();
 
     netup_get_mac_address(mender_identity.value);
@@ -263,14 +208,6 @@ main(void) {
     LOG_INF("Mender client activated and running!");
 
     while (1) {
-        if (toggle) {
-            toggle = 0;
-            set_leds(pixels_payload1);
-        }
-        else {
-            toggle = 1;
-            set_leds(pixels_payload2);
-        }
 		k_msleep(SLEEP_TIME_MS);
     }
 
