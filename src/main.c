@@ -88,12 +88,17 @@ get_identity_cb(const mender_identity_t **identity) {
 }
 
 #ifdef CONFIG_DISPLAY
+#define WHITE 0xFFFF
+#define BLACK 0x0000
+#define RED   0xF800
+#define GREEN 0x07E0
+#define BLUE  0x001F
+
 static void test_display(void)
 {
     const struct device *display_dev = DEVICE_DT_GET(DT_CHOSEN(zephyr_display));
     struct display_capabilities caps;
     struct display_buffer_descriptor buf_desc;
-    uint16_t color;
     uint8_t *buf;
 
     if (!device_is_ready(display_dev)) {
@@ -106,11 +111,14 @@ static void test_display(void)
     display_get_capabilities(display_dev, &caps);
     LOG_INF("Display: %dx%d, pixel_format=%d", caps.x_resolution, caps.y_resolution, caps.current_pixel_format);
 
-    /* Fill with red color (RGB565: 0xF800) */
-    buf_desc.width = caps.x_resolution;
-    buf_desc.height = 10;  /* Draw 10 lines at a time */
-    buf_desc.pitch = caps.x_resolution;
-    buf_desc.buf_size = buf_desc.width * buf_desc.height * 2; /* RGB565 = 2 bytes */
+    int width = caps.x_resolution;
+    int height = caps.y_resolution;
+
+    /* Allocate buffer for one line */
+    buf_desc.width = width;
+    buf_desc.height = 1;
+    buf_desc.pitch = width;
+    buf_desc.buf_size = width * 2; /* RGB565 = 2 bytes per pixel */
 
     buf = k_malloc(buf_desc.buf_size);
     if (!buf) {
@@ -118,21 +126,54 @@ static void test_display(void)
         return;
     }
 
-    /* Red on this display: color mapping is R->B, G->R, B->G, so send green for red */
-    color = 0x07E0;
-    for (size_t i = 0; i < buf_desc.buf_size / 2; i++) {
-        ((uint16_t *)buf)[i] = color;
-    }
+    LOG_INF("Drawing diagnostic grid pattern...");
 
-    LOG_INF("Drawing red rectangle on display...");
-    for (int y = 0; y < caps.y_resolution; y += buf_desc.height) {
+    /* Draw a diagnostic pattern:
+     * - White background
+     * - 1-pixel black border at exact edges (row/col 0 and max)
+     * - Grid lines every 20 pixels
+     * - Colored corners: top-left=red, top-right=green, bottom-left=blue, bottom-right=white
+     * - Center crosshair
+     */
+    for (int y = 0; y < height; y++) {
+        for (int x = 0; x < width; x++) {
+            uint16_t color = WHITE;
+
+            /* 1-pixel border at exact edges */
+            if (y == 0 || y == height - 1 || x == 0 || x == width - 1) {
+                color = BLACK;
+            }
+            /* Grid lines every 20 pixels */
+            else if (x % 20 == 0 || y % 20 == 0) {
+                color = BLACK;
+            }
+            /* Center crosshair (10 pixels wide) */
+            else if ((x >= width/2 - 5 && x <= width/2 + 5 && y >= height/2 - 1 && y <= height/2 + 1) ||
+                     (y >= height/2 - 5 && y <= height/2 + 5 && x >= width/2 - 1 && x <= width/2 + 1)) {
+                color = BLACK;
+            }
+
+            /* Colored corner squares (20x20 pixels) */
+            if (x < 20 && y < 20) {
+                color = RED;  /* Top-left = red (will appear as some color) */
+            } else if (x >= width - 20 && y < 20) {
+                color = GREEN;  /* Top-right = green */
+            } else if (x < 20 && y >= height - 20) {
+                color = BLUE;  /* Bottom-left = blue */
+            } else if (x >= width - 20 && y >= height - 20) {
+                color = BLACK;  /* Bottom-right = black */
+            }
+
+            ((uint16_t *)buf)[x] = color;
+        }
         display_write(display_dev, 0, y, &buf_desc, buf);
     }
 
     k_free(buf);
 
     display_blanking_off(display_dev);
-    LOG_INF("Display test complete - should show red screen");
+    LOG_INF("Display test complete - diagnostic grid pattern");
+    LOG_INF("Expected: %dx%d grid, colored corners (R/G/B/Black), center crosshair", width, height);
 }
 #endif
 
