@@ -25,6 +25,7 @@ LOG_MODULE_REGISTER(mender_app, LOG_LEVEL_DBG);
 
 #ifdef CONFIG_DISPLAY
 #include <zephyr/drivers/display.h>
+#include "mender_logo.h"
 #endif
 
 
@@ -51,7 +52,7 @@ network_release_cb(void) {
 }
 
 static mender_err_t
-deployment_status_cb(mender_deployment_status_t status, char *desc) {
+deployment_status_cb(mender_deployment_status_t status, const char *desc) {
     LOG_DBG("deployment_status_cb: %s", desc);
     return MENDER_OK;
 }
@@ -79,9 +80,11 @@ get_identity_cb(const mender_identity_t **identity) {
 }
 
 #ifdef CONFIG_DISPLAY
-static void init_display(void)
+static void display_logo(void)
 {
     const struct device *display_dev = DEVICE_DT_GET(DT_CHOSEN(zephyr_display));
+    struct display_capabilities caps;
+    struct display_buffer_descriptor desc;
 
     if (!device_is_ready(display_dev)) {
         LOG_ERR("Display device not ready");
@@ -89,7 +92,43 @@ static void init_display(void)
     }
 
     LOG_INF("Display device: %s", display_dev->name);
+
+    display_get_capabilities(display_dev, &caps);
+    LOG_INF("Display: %dx%d, pixel format: %d",
+            caps.x_resolution, caps.y_resolution,
+            caps.current_pixel_format);
+
+    /* Fill background with white - write full rows at a time for speed */
+    static uint16_t white_row[320];
+    for (size_t i = 0; i < caps.x_resolution && i < 320; i++) {
+        white_row[i] = 0xFFFF;
+    }
+    desc.buf_size = caps.x_resolution * 2;
+    desc.pitch = caps.x_resolution;
+    desc.width = caps.x_resolution;
+    desc.height = 1;
+
+    for (size_t y = 0; y < caps.y_resolution; y++) {
+        display_write(display_dev, 0, y, &desc, white_row);
+    }
+
+    /* Calculate centered position for logo */
+    size_t x_offset = (caps.x_resolution - MENDER_LOGO_WIDTH) / 2;
+    size_t y_offset = (caps.y_resolution - MENDER_LOGO_HEIGHT) / 2;
+
+    /* Draw logo line by line */
+    desc.buf_size = MENDER_LOGO_WIDTH * 2;
+    desc.pitch = MENDER_LOGO_WIDTH;
+    desc.width = MENDER_LOGO_WIDTH;
+    desc.height = 1;
+
+    for (size_t y = 0; y < MENDER_LOGO_HEIGHT; y++) {
+        display_write(display_dev, x_offset, y_offset + y, &desc,
+                      &mender_logo_rgb565[y * MENDER_LOGO_WIDTH]);
+    }
+
     display_blanking_off(display_dev);
+    LOG_INF("Mender logo displayed");
 }
 #endif
 
@@ -97,7 +136,7 @@ int
 main(void) {
 
 #ifdef CONFIG_DISPLAY
-    init_display();
+    display_logo();
 #endif
 
     LOG_INF("Initializing network...");
