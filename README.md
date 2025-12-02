@@ -27,6 +27,10 @@ This setup uses [ESP32-S3-DevKitC](https://docs.espressif.com/projects/esp-dev-k
 
 The W5500 and display use separate SPI buses (SPI2 and SPI3) because W5500 requires hardware CS.
 
+#### MAC Address
+
+The W5500 MAC address is derived at runtime from the ESP32's unique chip ID (efuse). This allows the same firmware image to be used on multiple boards, each getting a unique, stable MAC address. The MAC uses Wiznet's OUI (00:08:DC) combined with a CRC32 hash of the chip ID for good distribution.
+
 #### Wiring
 
 **W5500 Ethernet (SPI2):**

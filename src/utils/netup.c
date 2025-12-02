@@ -33,9 +33,17 @@ LOG_MODULE_DECLARE(mender_app, LOG_LEVEL_DBG);
 #include <zephyr/kernel.h>
 #include <zephyr/net/net_if.h>
 #include <zephyr/net/net_mgmt.h>
+#include <zephyr/drivers/hwinfo.h>
+#include <zephyr/net/ethernet_mgmt.h>
+#include <zephyr/sys/crc.h>
 #if defined(CONFIG_WIFI)
 #include <zephyr/net/wifi_mgmt.h>
 #endif
+
+/* Wiznet OUI for W5500 */
+#define WIZNET_OUI_B0 0x00
+#define WIZNET_OUI_B1 0x08
+#define WIZNET_OUI_B2 0xDC
 
 static K_SEM_DEFINE(network_ready_sem, 0, 1);
 
@@ -73,6 +81,75 @@ wifi_connect(struct net_if *iface) {
 
 #endif
 
+/**
+ * Derive a unique MAC address from the ESP32 chip ID.
+ *
+ * Uses CRC32 hash of the full 6-byte chip ID to ensure good distribution
+ * even for chips from the same production batch with sequential IDs.
+ * The resulting MAC uses Wiznet's OUI (00:08:DC) for W5500 compatibility.
+ */
+static int set_mac_from_chip_id(struct net_if *iface)
+{
+    uint8_t chip_id[6];
+    ssize_t len = hwinfo_get_device_id(chip_id, sizeof(chip_id));
+    if (len < 6) {
+        LOG_ERR("Failed to get chip ID (len=%d)", (int)len);
+        return -ENODEV;
+    }
+
+    LOG_INF("Chip ID: %02x:%02x:%02x:%02x:%02x:%02x",
+            chip_id[0], chip_id[1], chip_id[2],
+            chip_id[3], chip_id[4], chip_id[5]);
+
+    /*
+     * Hash the full chip ID to derive 3 bytes for the MAC.
+     * CRC32 provides good avalanche properties - small input changes
+     * cause large output changes, avoiding collisions for sequential IDs.
+     */
+    uint32_t hash = crc32_ieee(chip_id, len);
+
+    struct ethernet_req_params params;
+    params.mac_address.addr[0] = WIZNET_OUI_B0;
+    params.mac_address.addr[1] = WIZNET_OUI_B1;
+    params.mac_address.addr[2] = WIZNET_OUI_B2;
+    params.mac_address.addr[3] = (hash >> 16) & 0xFF;
+    params.mac_address.addr[4] = (hash >> 8) & 0xFF;
+    params.mac_address.addr[5] = hash & 0xFF;
+
+    LOG_INF("Derived MAC: %02x:%02x:%02x:%02x:%02x:%02x",
+            params.mac_address.addr[0], params.mac_address.addr[1],
+            params.mac_address.addr[2], params.mac_address.addr[3],
+            params.mac_address.addr[4], params.mac_address.addr[5]);
+
+    /*
+     * MAC can only be changed when interface is administratively down.
+     * Zephyr auto-starts interfaces, so we need to bring it down first.
+     */
+    int ret = net_if_down(iface);
+    if (ret < 0 && ret != -EALREADY) {
+        LOG_ERR("Failed to bring interface down: %d", ret);
+        return ret;
+    }
+
+    ret = net_mgmt(NET_REQUEST_ETHERNET_SET_MAC_ADDRESS, iface,
+                   &params, sizeof(params));
+    if (ret < 0) {
+        LOG_ERR("Failed to set MAC address: %d", ret);
+        /* Try to bring interface back up even if MAC setting failed */
+        net_if_up(iface);
+        return ret;
+    }
+
+    /* Bring interface back up */
+    ret = net_if_up(iface);
+    if (ret < 0) {
+        LOG_ERR("Failed to bring interface up: %d", ret);
+        return ret;
+    }
+
+    return 0;
+}
+
 static void
 event_handler(struct net_mgmt_event_callback *cb, uint64_t mgmt_event, struct net_if *iface) {
     int i = 0;
@@ -109,6 +186,13 @@ netup_wait_for_network(void) {
     the default and and continue blindly */
     struct net_if *iface = net_if_get_default();
     LOG_INF("Using net interface %s, index=%d", net_if_get_device(iface)->name, net_if_get_by_iface(iface));
+
+    /* Set MAC from chip ID before bringing interface up.
+     * This must happen before net_dhcpv4_start() which triggers interface UP. */
+    int ret = set_mac_from_chip_id(iface);
+    if (ret < 0) {
+        LOG_WRN("Failed to set MAC from chip ID: %d, using default", ret);
+    }
 
 #if defined(CONFIG_WIFI)
     wifi_connect(iface);
