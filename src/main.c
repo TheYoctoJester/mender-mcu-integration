@@ -18,6 +18,7 @@ LOG_MODULE_REGISTER(mender_app, LOG_LEVEL_DBG);
 #include "utils/callbacks.h"
 #include "utils/netup.h"
 #include "utils/certs.h"
+#include "utils/heartbeat.h"
 
 #include <zephyr/kernel.h>
 #include <zephyr/sys/reboot.h>
@@ -157,6 +158,9 @@ static void display_logo(void)
 int
 main(void) {
     LOG_INF("Mender MCU Integration on Zephyr %s", KERNEL_VERSION_STRING);
+
+    /* Start heartbeat LED early to indicate boot */
+    heartbeat_start();
 
 #ifdef CONFIG_DISPLAY
     display_logo();

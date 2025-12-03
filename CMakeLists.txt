@@ -16,6 +16,7 @@ target_sources(app PRIVATE
     src/main.c
     src/utils/netup.c
     src/utils/certs.c
+    src/utils/heartbeat.c
 )
 
 target_include_directories(app PUBLIC
