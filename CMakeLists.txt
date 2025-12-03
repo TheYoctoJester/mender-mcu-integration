@@ -17,6 +17,8 @@ target_sources(app PRIVATE
     src/utils/netup.c
     src/utils/certs.c
     src/utils/heartbeat.c
+    src/utils/font8x16.c
+    src/utils/display_scroll.c
 )
 
 target_include_directories(app PUBLIC

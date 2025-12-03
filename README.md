@@ -59,6 +59,12 @@ The W5500 MAC address is derived at runtime from the ESP32's unique chip ID (efu
 
 See [docs/display-wiring.md](docs/display-wiring.md) for detailed wiring and configuration.
 
+#### Display Features
+
+The display shows:
+- **Mender logo** centered on the screen
+- **Scrolling text ticker** at the bottom showing Zephyr version, build date, and device type
+
 #### Regenerating the Display Logo
 
 The Mender logo displayed on the ILI9341 is stored as RGB565 pixel data in `src/mender_logo.h`. To regenerate it from the source PNG (requires Python 3 with Pillow):
