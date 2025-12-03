@@ -59,6 +59,67 @@ The W5500 MAC address is derived at runtime from the ESP32's unique chip ID (efu
 
 See [docs/display-wiring.md](docs/display-wiring.md) for detailed wiring and configuration.
 
+#### Regenerating the Display Logo
+
+The Mender logo displayed on the ILI9341 is stored as RGB565 pixel data in `src/mender_logo.h`. To regenerate it from the source PNG (requires Python 3 with Pillow):
+
+```bash
+# Download the high-resolution source logo
+curl -LO https://raw.githubusercontent.com/mendersoftware/mender/master/mender_logo.png
+
+# Convert to RGB565 header file
+python3 << 'EOF'
+from PIL import Image
+
+img = Image.open('mender_logo.png')
+target_width = 300
+target_height = int(target_width * img.size[1] / img.size[0])
+
+img_resized = img.resize((target_width, target_height), Image.LANCZOS)
+
+if img_resized.mode == 'RGBA':
+    background = Image.new('RGB', img_resized.size, (255, 255, 255))
+    background.paste(img_resized, mask=img_resized.split()[3])
+    img_rgb = background
+else:
+    img_rgb = img_resized.convert('RGB')
+
+def rgb_to_ili9341(r, g, b):
+    r5 = (r >> 3) & 0x1F
+    g6 = (g >> 2) & 0x3F
+    b5 = (b >> 3) & 0x1F
+    rgb565 = (r5 << 11) | (g6 << 5) | b5
+    return ((rgb565 & 0xFF) << 8) | ((rgb565 >> 8) & 0xFF)
+
+pixels = list(img_rgb.getdata())
+
+with open('src/mender_logo.h', 'w') as f:
+    f.write(f'''/*
+ * Mender logo - RGB565 format (byte-swapped for ILI9341)
+ * Size: {target_width}x{target_height}
+ * Source: https://github.com/mendersoftware/mender/blob/master/mender_logo.png
+ * Auto-generated - do not edit manually
+ */
+
+#ifndef MENDER_LOGO_H
+#define MENDER_LOGO_H
+
+#include <stdint.h>
+
+#define MENDER_LOGO_WIDTH  {target_width}
+#define MENDER_LOGO_HEIGHT {target_height}
+
+static const uint16_t mender_logo_rgb565[{len(pixels)}] = {{
+''')
+    for i in range(0, len(pixels), 16):
+        row = [rgb_to_ili9341(*p) for p in pixels[i:i+16]]
+        f.write('    ' + ','.join(f'0x{v:04x}' for v in row) + ',\n')
+    f.write('};\n\n#endif /* MENDER_LOGO_H */\n')
+
+print(f"Generated src/mender_logo.h ({target_width}x{target_height})")
+EOF
+```
+
 #### Build and Flash
 
 ```
