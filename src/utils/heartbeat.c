@@ -84,17 +84,4 @@ K_THREAD_DEFINE(heartbeat_tid, HEARTBEAT_STACK_SIZE,
                 heartbeat_thread, NULL, NULL, NULL,
                 HEARTBEAT_PRIORITY, 0, 0);
 
-void heartbeat_start(void)
-{
-    /* Thread auto-starts via K_THREAD_DEFINE */
-    LOG_INF("Heartbeat thread initialized");
-}
-
-#else /* !DT_NODE_EXISTS(STRIP_NODE) */
-
-void heartbeat_start(void)
-{
-    LOG_WRN("No LED strip configured, heartbeat disabled");
-}
-
 #endif /* DT_NODE_EXISTS(STRIP_NODE) */

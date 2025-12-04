@@ -14,11 +14,13 @@ project(mender-mcu-integration)
 
 target_sources(app PRIVATE
     src/main.c
+    src/callbacks.c
     src/utils/netup.c
     src/utils/certs.c
     src/utils/heartbeat.c
-    src/utils/font8x16.c
-    src/utils/display_scroll.c
+    src/display/display.c
+    src/display/scroll.c
+    src/display/font8x16.c
 )
 
 target_include_directories(app PUBLIC

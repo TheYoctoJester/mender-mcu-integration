@@ -12,16 +12,15 @@
 //    See the License for the specific language governing permissions and
 //    limitations under the License.
 
-#ifndef DISPLAY_SCROLL_H
-#define DISPLAY_SCROLL_H
+#ifndef SCROLL_H
+#define SCROLL_H
 
-/**
- * Initialize and start the scrolling text animation.
- * Text scrolls continuously below the logo showing version/build info.
+/*
+ * Scrolling text display module.
  *
- * Requires CONFIG_DISPLAY to be enabled.
- * If no display is configured, this function does nothing.
+ * Text scrolls continuously below the logo showing version/build info.
+ * The scroll thread auto-starts via K_THREAD_DEFINE when CONFIG_DISPLAY
+ * is enabled. No external API is needed.
  */
-void display_scroll_start(void);
 
-#endif /* DISPLAY_SCROLL_H */
+#endif /* SCROLL_H */

@@ -12,17 +12,16 @@
 //    See the License for the specific language governing permissions and
 //    limitations under the License.
 
-#ifndef HEARTBEAT_H
-#define HEARTBEAT_H
+#ifndef DISPLAY_H
+#define DISPLAY_H
 
-/*
- * Heartbeat LED module.
+/**
+ * Initialize the display subsystem.
+ * Renders the Mender logo centered on the display.
  *
- * The LED pulses to indicate the system is running.
- * On ESP32-S3-DevKitC, uses the on-board WS2812 RGB LED.
- *
- * The heartbeat thread auto-starts via K_THREAD_DEFINE when
- * the led_strip device tree alias exists. No external API is needed.
+ * Requires CONFIG_DISPLAY to be enabled.
+ * If no display is configured, this function does nothing.
  */
+void display_init(void);
 
-#endif /* HEARTBEAT_H */
+#endif /* DISPLAY_H */

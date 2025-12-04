@@ -12,7 +12,7 @@
 //    See the License for the specific language governing permissions and
 //    limitations under the License.
 
-#include "display_scroll.h"
+#include "scroll.h"
 
 #include <zephyr/kernel.h>
 #include <zephyr/device.h>
@@ -164,18 +164,5 @@ static void scroll_thread(void *p1, void *p2, void *p3)
 K_THREAD_DEFINE(scroll_tid, SCROLL_STACK_SIZE,
                 scroll_thread, NULL, NULL, NULL,
                 SCROLL_PRIORITY, 0, 0);
-
-void display_scroll_start(void)
-{
-    /* Thread auto-starts via K_THREAD_DEFINE */
-    LOG_INF("Display scroll thread initialized");
-}
-
-#else /* !CONFIG_DISPLAY */
-
-void display_scroll_start(void)
-{
-    LOG_WRN("No display configured, scroll disabled");
-}
 
 #endif /* CONFIG_DISPLAY */

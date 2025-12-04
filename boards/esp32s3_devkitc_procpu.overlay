@@ -106,6 +106,7 @@
 				 LED_COLOR_ID_RED
 				 LED_COLOR_ID_BLUE>;
 		reset-delay = <250>;
+		extra-wait-time = <5000>;  /* 5ms extra wait for ESP32 I2S */
 	};
 };
 

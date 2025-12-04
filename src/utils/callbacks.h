@@ -58,6 +58,21 @@ mender_err_t mender_restart_cb(void);
  */
 mender_err_t mender_get_identity_cb(const mender_identity_t **identity);
 
+/**
+ * @brief Callback to provide persistent inventory data.
+ * @param keystore Pointer to receive the inventory keystore array
+ * @param keystore_len Pointer to receive the number of entries
+ * @return return MENDER_OK on success, MENDER_FAIL on error
+ */
+mender_err_t persistent_inventory_cb(mender_keystore_t **keystore, uint8_t *keystore_len);
+
+/**
+ * @brief Get pointer to the mender identity value buffer.
+ * Used to populate the MAC address during network initialization.
+ * @return Pointer to the identity value buffer
+ */
+char *get_mender_identity_value(void);
+
 #ifdef __cplusplus
 }
 #endif /* __cplusplus */
