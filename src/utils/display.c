@@ -129,36 +129,25 @@ static struct display_capabilities caps;
 /* Row buffer for text rendering - max 320 pixels wide */
 static uint16_t row_buffer[320];
 
-static void draw_char(uint16_t x, uint16_t y, char c, uint16_t fg, uint16_t bg)
-{
-    if (c < 32 || c > 126) {
-        c = '?';
-    }
-
-    const uint8_t *glyph = font_5x7[c - 32];
-    struct display_buffer_descriptor desc = {
-        .buf_size = FONT_WIDTH * 2,
-        .pitch = FONT_WIDTH,
-        .width = FONT_WIDTH,
-        .height = 1,
-    };
-
-    for (int row = 0; row < FONT_HEIGHT; row++) {
-        for (int col = 0; col < FONT_WIDTH; col++) {
-            bool pixel = (glyph[col] >> row) & 0x01;
-            row_buffer[col] = pixel ? fg : bg;
-        }
-        display_write(display_dev, x, y + row, &desc, row_buffer);
-    }
-}
-
-static void draw_string(uint16_t x, uint16_t y, const char *str, uint16_t fg, uint16_t bg)
+/* Render a text string into row_buffer at the given x offset for one font row.
+ * Pixels that are "on" are set to fg; background pixels are left untouched
+ * (caller pre-fills with background color). */
+static void render_text_row(uint16_t x, const char *str, uint16_t font_row, uint16_t fg)
 {
     while (*str) {
-        if (x + CHAR_WIDTH > caps.x_resolution) {
+        if (x + FONT_WIDTH > caps.x_resolution) {
             break;
         }
-        draw_char(x, y, *str, fg, bg);
+        char c = *str;
+        if (c < 32 || c > 126) {
+            c = '?';
+        }
+        const uint8_t *glyph = font_5x7[c - 32];
+        for (int col = 0; col < FONT_WIDTH; col++) {
+            if ((glyph[col] >> font_row) & 0x01) {
+                row_buffer[x + col] = fg;
+            }
+        }
         x += CHAR_WIDTH;
         str++;
     }
@@ -191,7 +180,9 @@ void display_logo(void)
 
     struct display_buffer_descriptor desc;
 
-    /* Fill background with white - write full rows at a time */
+    uint16_t footer_y = caps.y_resolution - FOOTER_HEIGHT;
+
+    /* Fill logo area with white */
     for (size_t i = 0; i < caps.x_resolution && i < 320; i++) {
         row_buffer[i] = COLOR_WHITE;
     }
@@ -200,7 +191,15 @@ void display_logo(void)
     desc.width = caps.x_resolution;
     desc.height = 1;
 
-    for (size_t y = 0; y < caps.y_resolution; y++) {
+    for (size_t y = 0; y < footer_y; y++) {
+        display_write(display_dev, 0, y, &desc, row_buffer);
+    }
+
+    /* Fill footer area with teal */
+    for (size_t i = 0; i < caps.x_resolution && i < 320; i++) {
+        row_buffer[i] = COLOR_TEAL;
+    }
+    for (size_t y = footer_y; y < caps.y_resolution; y++) {
         display_write(display_dev, 0, y, &desc, row_buffer);
     }
 
@@ -220,18 +219,26 @@ void display_logo(void)
     LOG_INF("Mender logo displayed");
 }
 
+/* Small left margin within each column */
+#define COL_PADDING 4
+
 void display_update_footer(const char *version, const char *ip_addr, const char *state)
 {
     if (!device_is_ready(display_dev)) {
         return;
     }
 
-    /* Footer background - teal bar at bottom */
     uint16_t footer_y = caps.y_resolution - FOOTER_HEIGHT;
+    uint16_t text_row_start = (FOOTER_HEIGHT - FONT_HEIGHT) / 2;
+    uint16_t col_width = caps.x_resolution / 3;
 
-    for (size_t i = 0; i < caps.x_resolution && i < 320; i++) {
-        row_buffer[i] = COLOR_TEAL;
-    }
+    const char *ver_str = version ? version : "?";
+    const char *ip_str = ip_addr ? ip_addr : "No IP";
+    const char *state_str = state ? state : "?";
+
+    uint16_t ver_x = COL_PADDING;
+    uint16_t ip_x = col_width + COL_PADDING;
+    uint16_t state_x = col_width * 2 + COL_PADDING;
 
     struct display_buffer_descriptor desc = {
         .buf_size = caps.x_resolution * 2,
@@ -240,20 +247,20 @@ void display_update_footer(const char *version, const char *ip_addr, const char 
         .height = 1,
     };
 
-    for (size_t y = 0; y < FOOTER_HEIGHT; y++) {
-        display_write(display_dev, 0, footer_y + y, &desc, row_buffer);
+    for (uint16_t row = 0; row < FOOTER_HEIGHT; row++) {
+        for (size_t i = 0; i < caps.x_resolution && i < 320; i++) {
+            row_buffer[i] = COLOR_TEAL;
+        }
+
+        if (row >= text_row_start && row < text_row_start + FONT_HEIGHT) {
+            uint16_t font_row = row - text_row_start;
+            render_text_row(ver_x, ver_str, font_row, COLOR_WHITE);
+            render_text_row(ip_x, ip_str, font_row, COLOR_WHITE);
+            render_text_row(state_x, state_str, font_row, COLOR_WHITE);
+        }
+
+        display_write(display_dev, 0, footer_y + row, &desc, row_buffer);
     }
-
-    /* Build footer text: "v1.2.3 | 192.168.1.100 | Idle" */
-    char footer_text[64];
-    snprintf(footer_text, sizeof(footer_text), "%s | %s | %s",
-             version ? version : "?",
-             ip_addr ? ip_addr : "No IP",
-             state ? state : "?");
-
-    /* Center text vertically in footer, with small left margin */
-    uint16_t text_y = footer_y + (FOOTER_HEIGHT - FONT_HEIGHT) / 2;
-    draw_string(4, text_y, footer_text, COLOR_WHITE, COLOR_TEAL);
 }
 
 int display_get_ip_string(char *buf, size_t buf_len)
@@ -262,6 +269,11 @@ int display_get_ip_string(char *buf, size_t buf_len)
     if (!iface) {
         snprintf(buf, buf_len, "No iface");
         return -ENODEV;
+    }
+
+    if (!iface->config.ip.ipv4) {
+        snprintf(buf, buf_len, "No IP");
+        return -ENOENT;
     }
 
     for (int i = 0; i < NET_IF_MAX_IPV4_ADDR; i++) {

@@ -45,7 +45,7 @@
 			width = <320>;
 			height = <240>;
 			pixel-format = <ILI9XXX_PIXEL_FORMAT_RGB565>;
-			rotation = <90>;
+			rotation = <270>;
 		};
 	};
 };

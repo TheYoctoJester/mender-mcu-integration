@@ -29,13 +29,17 @@ extern "C" {
 #define CHAR_HEIGHT 8  /* includes 1px spacing */
 
 /* Footer configuration */
-#define FOOTER_HEIGHT    10
-#define FOOTER_Y_OFFSET  2  /* padding from bottom */
+#define FOOTER_HEIGHT    16
 
-/* RGB565 colors */
-#define COLOR_WHITE  0xFFFF
-#define COLOR_BLACK  0x0000
-#define COLOR_TEAL   0x0410  /* Mender teal ~#00837f */
+/*
+ * RGB565 colors in big-endian byte order, as required by the Zephyr
+ * display API for multi-byte pixel formats.
+ */
+#define RGB565_BE(c) ((uint16_t)(((c) >> 8) | (((c) & 0xFF) << 8)))
+
+#define COLOR_WHITE  RGB565_BE(0xFFFF)
+#define COLOR_BLACK  RGB565_BE(0x0000)
+#define COLOR_TEAL   RGB565_BE(0x0410)  /* Mender teal ~#00837f */
 
 /**
  * @brief Initialize display subsystem
