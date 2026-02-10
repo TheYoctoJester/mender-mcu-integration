@@ -24,12 +24,11 @@ LOG_MODULE_REGISTER(mender_app, LOG_LEVEL_DBG);
 #include "mender/client.h"
 
 #ifdef CONFIG_DISPLAY
-#include <zephyr/drivers/display.h>
-#include "mender_logo.h"
+#include "utils/display.h"
 #endif
 
-
 #define SLEEP_TIME_MS 1000
+#define FOOTER_UPDATE_INTERVAL_MS 5000
 
 #ifdef CONFIG_MENDER_ZEPHYR_IMAGE_UPDATE_MODULE
 #include <mender/zephyr-image-update-module.h>
@@ -38,6 +37,31 @@ LOG_MODULE_REGISTER(mender_app, LOG_LEVEL_DBG);
 #ifdef CONFIG_MENDER_APP_NOOP_UPDATE_MODULE
 #include "modules/noop-update-module.h"
 #endif /* CONFIG_MENDER_APP_NOOP_UPDATE_MODULE */
+
+/* Client state tracking */
+static const char *client_state = "Init";
+static bool state_changed = false;
+
+#ifdef CONFIG_DISPLAY
+static void update_footer(void)
+{
+    char ip_buf[16];
+    display_get_ip_string(ip_buf, sizeof(ip_buf));
+    display_update_footer(mender_client_version(), ip_buf, client_state);
+}
+#endif
+
+static void set_client_state(const char *new_state)
+{
+    if (client_state != new_state) {
+        client_state = new_state;
+        state_changed = true;
+        LOG_INF("Client state: %s", client_state);
+#ifdef CONFIG_DISPLAY
+        update_footer();
+#endif
+    }
+}
 
 static mender_err_t
 network_connect_cb(void) {
@@ -54,6 +78,27 @@ network_release_cb(void) {
 static mender_err_t
 deployment_status_cb(mender_deployment_status_t status, const char *desc) {
     LOG_DBG("deployment_status_cb: %s", desc);
+
+    switch (status) {
+    case MENDER_DEPLOYMENT_STATUS_DOWNLOADING:
+        set_client_state("Downloading");
+        break;
+    case MENDER_DEPLOYMENT_STATUS_INSTALLING:
+        set_client_state("Installing");
+        break;
+    case MENDER_DEPLOYMENT_STATUS_REBOOTING:
+        set_client_state("Rebooting");
+        break;
+    case MENDER_DEPLOYMENT_STATUS_SUCCESS:
+        set_client_state("Success");
+        break;
+    case MENDER_DEPLOYMENT_STATUS_FAILURE:
+        set_client_state("Failed");
+        break;
+    default:
+        break;
+    }
+
     return MENDER_OK;
 }
 
@@ -79,66 +124,17 @@ get_identity_cb(const mender_identity_t **identity) {
     return MENDER_FAIL;
 }
 
-#ifdef CONFIG_DISPLAY
-static void display_logo(void)
-{
-    const struct device *display_dev = DEVICE_DT_GET(DT_CHOSEN(zephyr_display));
-    struct display_capabilities caps;
-    struct display_buffer_descriptor desc;
-
-    if (!device_is_ready(display_dev)) {
-        LOG_ERR("Display device not ready");
-        return;
-    }
-
-    LOG_INF("Display device: %s", display_dev->name);
-
-    display_get_capabilities(display_dev, &caps);
-    LOG_INF("Display: %dx%d, pixel format: %d",
-            caps.x_resolution, caps.y_resolution,
-            caps.current_pixel_format);
-
-    /* Fill background with white - write full rows at a time for speed */
-    static uint16_t white_row[320];
-    for (size_t i = 0; i < caps.x_resolution && i < 320; i++) {
-        white_row[i] = 0xFFFF;
-    }
-    desc.buf_size = caps.x_resolution * 2;
-    desc.pitch = caps.x_resolution;
-    desc.width = caps.x_resolution;
-    desc.height = 1;
-
-    for (size_t y = 0; y < caps.y_resolution; y++) {
-        display_write(display_dev, 0, y, &desc, white_row);
-    }
-
-    /* Calculate centered position for logo */
-    size_t x_offset = (caps.x_resolution - MENDER_LOGO_WIDTH) / 2;
-    size_t y_offset = (caps.y_resolution - MENDER_LOGO_HEIGHT) / 2;
-
-    /* Draw logo line by line */
-    desc.buf_size = MENDER_LOGO_WIDTH * 2;
-    desc.pitch = MENDER_LOGO_WIDTH;
-    desc.width = MENDER_LOGO_WIDTH;
-    desc.height = 1;
-
-    for (size_t y = 0; y < MENDER_LOGO_HEIGHT; y++) {
-        display_write(display_dev, x_offset, y_offset + y, &desc,
-                      &mender_logo_rgb565[y * MENDER_LOGO_WIDTH]);
-    }
-
-    display_blanking_off(display_dev);
-    LOG_INF("Mender logo displayed");
-}
-#endif
-
 int
 main(void) {
 
 #ifdef CONFIG_DISPLAY
-    display_logo();
+    if (display_init() == 0) {
+        display_logo();
+        update_footer();
+    }
 #endif
 
+    set_client_state("Net wait");
     LOG_INF("Initializing network...");
     netup_wait_for_network();
 
@@ -146,9 +142,16 @@ main(void) {
 
     certs_add_credentials();
 
+#ifdef CONFIG_DISPLAY
+    /* Update footer now that we have an IP */
+    update_footer();
+#endif
+
     LOG_INF("Initializing Mender Client with:");
     LOG_INF("   Device type:   '%s'", CONFIG_MENDER_DEVICE_TYPE);
     LOG_INF("   Identity:      '{\"%s\": \"%s\"}'", mender_identity.name, mender_identity.value);
+
+    set_client_state("Starting");
 
     /* Initialize mender-client */
     mender_client_config_t    mender_client_config    = { .device_type = NULL, .recommissioning = false };
@@ -161,6 +164,7 @@ main(void) {
 
     if (MENDER_OK != mender_client_init(&mender_client_config, &mender_client_callbacks)) {
         LOG_ERR("Failed to initialize the client");
+        set_client_state("Error");
         goto END;
     }
     LOG_INF("Mender client initialized");
@@ -168,6 +172,7 @@ main(void) {
 #ifdef CONFIG_MENDER_ZEPHYR_IMAGE_UPDATE_MODULE
     if (MENDER_OK != mender_zephyr_image_register_update_module()) {
         LOG_ERR("Failed to register the zephyr-image Update Module");
+        set_client_state("Error");
         goto END;
     }
     LOG_INF("Update Module 'zephyr-image' initialized");
@@ -176,6 +181,7 @@ main(void) {
 #ifdef CONFIG_MENDER_APP_NOOP_UPDATE_MODULE
     if (MENDER_OK != noop_update_module_register()) {
         LOG_ERR("Failed to register the noop Update Module");
+        set_client_state("Error");
         goto END;
     }
     LOG_INF("Update Module 'noop-update' initialized");
@@ -184,16 +190,32 @@ main(void) {
     /* Finally activate mender client */
     if (MENDER_OK != mender_client_activate()) {
         LOG_ERR("Unable to activate the client");
+        set_client_state("Error");
         goto END;
     }
     LOG_INF("Mender client activated and running!");
 
+    set_client_state("Idle");
+
+#ifdef CONFIG_DISPLAY
+    uint32_t footer_timer = 0;
+#endif
+
     while (1) {
-		k_msleep(SLEEP_TIME_MS);
+        k_msleep(SLEEP_TIME_MS);
+
+#ifdef CONFIG_DISPLAY
+        /* Periodically refresh footer to catch IP changes */
+        footer_timer += SLEEP_TIME_MS;
+        if (footer_timer >= FOOTER_UPDATE_INTERVAL_MS) {
+            footer_timer = 0;
+            update_footer();
+        }
+#endif
     }
 
 END:
-	k_sleep(K_FOREVER);
+    k_sleep(K_FOREVER);
 
     return 0;
 }
