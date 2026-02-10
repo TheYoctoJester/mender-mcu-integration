@@ -33,7 +33,7 @@ def rgb_to_rgb565(r: int, g: int, b: int, swap_bytes: bool = False) -> int:
     return rgb565
 
 
-def convert_png_to_rgb565(input_path: Path, width: int, height: int, swap_bytes: bool) -> tuple[list[int], int, int]:
+def convert_png_to_rgb565(input_path: Path, width: int, height: int, swap_bytes: bool, rotate: int = 0) -> tuple[list[int], int, int]:
     """Load PNG, scale to dimensions, and convert to RGB565."""
     img = Image.open(input_path)
 
@@ -60,6 +60,10 @@ def convert_png_to_rgb565(input_path: Path, width: int, height: int, swap_bytes:
 
     # Resize with high-quality resampling
     img = img.resize((new_width, new_height), Image.Resampling.LANCZOS)
+
+    # Apply rotation if requested
+    if rotate:
+        img = img.rotate(rotate, expand=False)
 
     # Convert pixels to RGB565
     pixels = []
@@ -144,6 +148,13 @@ def main():
         action="store_true",
         help="Swap bytes for big-endian displays (e.g., ILI9341)"
     )
+    parser.add_argument(
+        "--rotate",
+        type=int,
+        default=0,
+        choices=[0, 90, 180, 270],
+        help="Rotate image by degrees (default: 0)"
+    )
 
     args = parser.parse_args()
 
@@ -152,7 +163,7 @@ def main():
         sys.exit(1)
 
     pixels, width, height = convert_png_to_rgb565(
-        args.input, args.width, args.height, args.swap_bytes
+        args.input, args.width, args.height, args.swap_bytes, args.rotate
     )
 
     header = generate_header(pixels, width, height, args.swap_bytes)

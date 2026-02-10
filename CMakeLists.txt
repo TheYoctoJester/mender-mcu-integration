@@ -61,6 +61,7 @@ add_custom_command(
         --width 280
         --height 94
         --swap-bytes
+        --rotate 180
     DEPENDS ${LOGO_INPUT} ${LOGO_SCRIPT}
     COMMENT "Converting logo.png to RGB565 header"
 )
