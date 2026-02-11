@@ -28,7 +28,7 @@ LOG_MODULE_REGISTER(mender_app, LOG_LEVEL_DBG);
 #endif
 
 #define SLEEP_TIME_MS 1000
-#define FOOTER_UPDATE_INTERVAL_MS 5000
+#define FOOTER_UPDATE_INTERVAL_MS 1000
 
 #ifdef CONFIG_MENDER_ZEPHYR_IMAGE_UPDATE_MODULE
 #include <mender/zephyr-image-update-module.h>
@@ -209,6 +209,7 @@ main(void) {
         footer_timer += SLEEP_TIME_MS;
         if (footer_timer >= FOOTER_UPDATE_INTERVAL_MS) {
             footer_timer = 0;
+            display_toggle_heartbeat();
             update_footer();
         }
 #endif

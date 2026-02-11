@@ -125,6 +125,7 @@ static const uint8_t font_5x7[][5] = {
 
 static const struct device *display_dev;
 static struct display_capabilities caps;
+static bool heartbeat_on;
 
 /* Row buffer for text rendering - max 320 pixels wide */
 static uint16_t row_buffer[320];
@@ -151,6 +152,11 @@ static void render_text_row(uint16_t x, const char *str, uint16_t font_row, uint
         x += CHAR_WIDTH;
         str++;
     }
+}
+
+void display_toggle_heartbeat(void)
+{
+    heartbeat_on = !heartbeat_on;
 }
 
 int display_init(void)
@@ -257,6 +263,8 @@ void display_update_footer(const char *version, const char *ip_addr, const char 
             render_text_row(ver_x, ver_str, font_row, COLOR_WHITE);
             render_text_row(ip_x, ip_str, font_row, COLOR_WHITE);
             render_text_row(state_x, state_str, font_row, COLOR_WHITE);
+            uint16_t hb_x = caps.x_resolution - CHAR_WIDTH - COL_PADDING;
+            render_text_row(hb_x, heartbeat_on ? "*" : " ", font_row, COLOR_WHITE);
         }
 
         display_write(display_dev, 0, footer_y + row, &desc, row_buffer);

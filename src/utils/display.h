@@ -61,6 +61,11 @@ void display_logo(void);
 void display_update_footer(const char *version, const char *ip_addr, const char *state);
 
 /**
+ * @brief Toggle the heartbeat indicator state
+ */
+void display_toggle_heartbeat(void);
+
+/**
  * @brief Get the current IP address as a string
  * @param buf Buffer to store IP address
  * @param buf_len Length of buffer
