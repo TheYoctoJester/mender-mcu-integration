@@ -47,7 +47,7 @@ static void update_footer(void)
 {
     char ip_buf[16];
     display_get_ip_string(ip_buf, sizeof(ip_buf));
-    display_update_footer(mender_client_version(), ip_buf, client_state);
+    display_update_footer(CONFIG_MENDER_ARTIFACT_NAME, ip_buf, client_state);
 }
 #endif
 

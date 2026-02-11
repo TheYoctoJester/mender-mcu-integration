@@ -246,6 +246,8 @@ The W5500 and display use separate SPI buses (SPI2 and SPI3) because W5500 requi
 | GND    | GND           |
 | Lite   | 3.3V          |
 
+**Note:** The ILI9341 display modules require solder bridges on jumpers IM1, IM2, and IM3 to select 4-wire SPI mode.
+
 See [docs/display-wiring.md](docs/display-wiring.md) for detailed wiring and configuration.
 
 #### Build and Flash
