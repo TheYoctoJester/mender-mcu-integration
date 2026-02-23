@@ -30,18 +30,10 @@ if(CONFIG_DISPLAY)
     target_sources(app PRIVATE src/utils/display.c)
 endif()
 
-# Amazon Root CA 1 certificate from https://www.amazontrust.com/repository
-# Used as primary CA certificate for Hosted Mender
+# Self-signed CA certificate for docker.mender.io demo server
 generate_inc_file_for_target(app
-    "certs/AmazonRootCA1.cer"
-    "${ZEPHYR_BINARY_DIR}/include/generated/AmazonRootCA1.cer.inc"
-)
-
-# Google Trust Services GTS Root R4 from https://pki.goog/repository
-# Used as secondary CA certificate for Artifacts from Hosted Mender
-generate_inc_file_for_target(app
-    "certs/GoogleRootR4.cer"
-    "${ZEPHYR_BINARY_DIR}/include/generated/GoogleRootR4.cer.inc"
+    "certs/docker-mender-io.cer"
+    "${ZEPHYR_BINARY_DIR}/include/generated/docker-mender-io.cer.inc"
 )
 
 file(COPY_FILE "config-tls-mender.h" "${ZEPHYR_BINARY_DIR}/include/generated/config-tls-mender.h")

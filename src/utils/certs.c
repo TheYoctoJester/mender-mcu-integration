@@ -19,14 +19,9 @@
 #include <zephyr/net/tls_credentials.h>
 
 #if defined(CONFIG_NET_SOCKETS_SOCKOPT_TLS)
-static const unsigned char ca_certificate_amazon[] = {
-#include "AmazonRootCA1.cer.inc"
+static const unsigned char ca_certificate_demo[] = {
+#include "docker-mender-io.cer.inc"
 };
-#ifdef CONFIG_MENDER_NET_CA_CERTIFICATE_TAG_SECONDARY_ENABLED
-static const unsigned char ca_certificate_google[] = {
-#include "GoogleRootR4.cer.inc"
-};
-#endif
 #endif
 
 int
@@ -34,14 +29,7 @@ certs_add_credentials(void) {
     int ret = 0;
 
 #if defined(CONFIG_NET_SOCKETS_SOCKOPT_TLS)
-    ret = tls_credential_add(CONFIG_MENDER_NET_CA_CERTIFICATE_TAG_PRIMARY, TLS_CREDENTIAL_CA_CERTIFICATE, ca_certificate_amazon, sizeof(ca_certificate_amazon));
-    if (ret != 0) {
-        return ret;
-    }
-#ifdef CONFIG_MENDER_NET_CA_CERTIFICATE_TAG_SECONDARY_ENABLED
-    ret = tls_credential_add(
-        CONFIG_MENDER_NET_CA_CERTIFICATE_TAG_SECONDARY, TLS_CREDENTIAL_CA_CERTIFICATE, ca_certificate_google, sizeof(ca_certificate_google));
-#endif
+    ret = tls_credential_add(CONFIG_MENDER_NET_CA_CERTIFICATE_TAG_PRIMARY, TLS_CREDENTIAL_CA_CERTIFICATE, ca_certificate_demo, sizeof(ca_certificate_demo));
 #endif
 
     return ret;

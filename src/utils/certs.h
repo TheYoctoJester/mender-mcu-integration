@@ -20,7 +20,7 @@ extern "C" {
 #endif /* __cplusplus */
 
 /**
- * @brief Install TLS credentials for Hosted Mender setup
+ * @brief Install TLS credentials for docker.mender.io demo server
  * @return return 0 on success, -EACCES, -ENOMEM or -EEXIST on error
  * @note See https://docs.zephyrproject.org/3.7.0/doxygen/html/group__tls__credentials.html#ga640ff6dd3eb4d5017feaab6fab2bb2f7
  */
