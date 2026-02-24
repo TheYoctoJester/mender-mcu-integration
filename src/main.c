@@ -20,6 +20,7 @@ LOG_MODULE_REGISTER(mender_app, LOG_LEVEL_DBG);
 
 #include <zephyr/kernel.h>
 #include <zephyr/sys/reboot.h>
+#include <zephyr/drivers/watchdog.h>
 
 #include "mender/client.h"
 
@@ -29,6 +30,10 @@ LOG_MODULE_REGISTER(mender_app, LOG_LEVEL_DBG);
 
 #define SLEEP_TIME_MS 1000
 #define FOOTER_UPDATE_INTERVAL_MS 1000
+#define WDT_TIMEOUT_MS 30000
+
+static const struct device *const wdt_dev = DEVICE_DT_GET(DT_ALIAS(watchdog0));
+static int wdt_channel_id = -1;
 
 #ifdef CONFIG_MENDER_ZEPHYR_IMAGE_UPDATE_MODULE
 #include <mender/zephyr-image-update-module.h>
@@ -134,6 +139,27 @@ main(void) {
     }
 #endif
 
+    /* Initialize hardware watchdog */
+    if (!device_is_ready(wdt_dev)) {
+        LOG_ERR("Watchdog device not ready");
+    } else {
+        struct wdt_timeout_cfg wdt_cfg = {
+            .window.min = 0,
+            .window.max = WDT_TIMEOUT_MS,
+            .callback = NULL,
+            .flags = WDT_FLAG_RESET_SOC,
+        };
+        wdt_channel_id = wdt_install_timeout(wdt_dev, &wdt_cfg);
+        if (wdt_channel_id < 0) {
+            LOG_ERR("Watchdog install failed: %d", wdt_channel_id);
+        } else if (wdt_setup(wdt_dev, WDT_OPT_PAUSE_HALTED_BY_DBG) != 0) {
+            LOG_ERR("Watchdog setup failed");
+            wdt_channel_id = -1;
+        } else {
+            LOG_INF("Watchdog started (%d ms timeout)", WDT_TIMEOUT_MS);
+        }
+    }
+
     set_client_state("Net wait");
     LOG_INF("Initializing network...");
     netup_wait_for_network();
@@ -203,6 +229,10 @@ main(void) {
 
     while (1) {
         k_msleep(SLEEP_TIME_MS);
+
+        if (wdt_channel_id >= 0) {
+            wdt_feed(wdt_dev, wdt_channel_id);
+        }
 
 #ifdef CONFIG_DISPLAY
         /* Periodically refresh footer to catch IP changes */
