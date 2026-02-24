@@ -33,6 +33,8 @@ LOG_MODULE_DECLARE(mender_app, LOG_LEVEL_DBG);
 #include <zephyr/kernel.h>
 #include <zephyr/net/net_if.h>
 #include <zephyr/net/net_mgmt.h>
+#include <zephyr/net/ethernet_mgmt.h>
+#include <soc/efuse_reg.h>
 #if defined(CONFIG_WIFI)
 #include <zephyr/net/wifi_mgmt.h>
 #endif
@@ -40,6 +42,35 @@ LOG_MODULE_DECLARE(mender_app, LOG_LEVEL_DBG);
 static K_SEM_DEFINE(network_ready_sem, 0, 1);
 
 static struct net_mgmt_event_callback mgmt_cb;
+
+static int
+set_mac_from_efuse(struct net_if *iface) {
+    struct ethernet_req_params params = { 0 };
+    uint8_t *mac = params.mac_address.addr;
+
+    /* Read the base MAC directly from eFuse registers.
+     * REG0 holds the low 32 bits, REG1[15:0] holds the high 16 bits. */
+    uint32_t mac_low  = sys_read32(EFUSE_RD_MAC_SPI_SYS_0_REG);
+    uint32_t mac_high = sys_read32(EFUSE_RD_MAC_SPI_SYS_1_REG);
+
+    mac[0] = (mac_high >> 8) & 0xFF;
+    mac[1] = (mac_high >> 0) & 0xFF;
+    mac[2] = (mac_low >> 24) & 0xFF;
+    mac[3] = (mac_low >> 16) & 0xFF;
+    mac[4] = (mac_low >>  8) & 0xFF;
+    mac[5] = (mac_low >>  0) & 0xFF;
+
+    int ret = net_mgmt(NET_REQUEST_ETHERNET_SET_MAC_ADDRESS, iface,
+                       &params, sizeof(params));
+    if (ret) {
+        LOG_ERR("Failed to set MAC address: %d", ret);
+        return ret;
+    }
+
+    LOG_INF("MAC from eFuse: %02x:%02x:%02x:%02x:%02x:%02x",
+            mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+    return 0;
+}
 
 #if defined(CONFIG_WIFI)
 
@@ -113,6 +144,8 @@ netup_wait_for_network(void) {
 #if defined(CONFIG_WIFI)
     wifi_connect(iface);
 #else
+    set_mac_from_efuse(iface);
+
     /* For WIFI, it is expected that the dhcp client is started somehow by the network management.
     This is the case for example for ESP32-S3 with configuration option WIFI_STA_AUTO_DHCPV4 */
     net_dhcpv4_start(iface);

@@ -11,8 +11,6 @@
 		int-gpios = <&gpio0 4 GPIO_ACTIVE_LOW>;
 		reset-gpios = <&gpio0 5 GPIO_ACTIVE_LOW>;
 
-		/* Set your MAC address here */
-		local-mac-address = [00 08 DC 01 02 03];
 		status = "okay";
 	};
 };
