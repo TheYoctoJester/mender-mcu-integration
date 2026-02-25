@@ -41,7 +41,11 @@ file(COPY_FILE "config-tls-mender.h" "${ZEPHYR_BINARY_DIR}/include/generated/con
 # Generate RGB565 logo header from PNG at build time
 find_package(Python3 REQUIRED COMPONENTS Interpreter)
 
-set(LOGO_INPUT "${CMAKE_CURRENT_SOURCE_DIR}/logo.png")
+if(DEFINED ENV{MENDER_LOGO_FILE})
+    set(LOGO_INPUT "${CMAKE_CURRENT_SOURCE_DIR}/$ENV{MENDER_LOGO_FILE}")
+else()
+    set(LOGO_INPUT "${CMAKE_CURRENT_SOURCE_DIR}/logo.png")
+endif()
 set(LOGO_OUTPUT "${ZEPHYR_BINARY_DIR}/include/generated/mender_logo.h")
 set(LOGO_SCRIPT "${CMAKE_CURRENT_SOURCE_DIR}/scripts/png_to_rgb565.py")
 

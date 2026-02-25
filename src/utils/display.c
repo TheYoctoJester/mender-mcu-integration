@@ -188,9 +188,10 @@ void display_logo(void)
 
     uint16_t footer_y = caps.y_resolution - FOOTER_HEIGHT;
 
-    /* Fill logo area with white */
+    /* Fill logo area with the logo's background color (top-left pixel) */
+    uint16_t logo_bg = mender_logo_rgb565[0];
     for (size_t i = 0; i < caps.x_resolution && i < 320; i++) {
-        row_buffer[i] = COLOR_WHITE;
+        row_buffer[i] = logo_bg;
     }
     desc.buf_size = caps.x_resolution * 2;
     desc.pitch = caps.x_resolution;
