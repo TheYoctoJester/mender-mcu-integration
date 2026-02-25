@@ -21,6 +21,10 @@
 	cs-gpios = <&gpio0 15 GPIO_ACTIVE_LOW>;  /* ILI9341 CS */
 };
 
+&esp32_bt_hci {
+	status = "disabled";
+};
+
 / {
 	chosen {
 		zephyr,display = &ili9341;
