@@ -5,6 +5,11 @@ manifest:
       url-base: https://github.com/zephyrproject-rtos
     - name: mender
       url-base: https://github.com/mendersoftware
+    # Fork carrying the SDRAM-staging fix for the artifact download on i.MX RT
+    # (XIP from the same FlexSPI NOR as the MCUboot slots). Temporary until the
+    # change is merged upstream, then point mender-mcu back to remote 'mender'.
+    - name: theyoctojester
+      url-base: https://github.com/TheYoctoJester
 
   projects:
     - name: zephyr
@@ -19,8 +24,8 @@ manifest:
           - hal_nordic
           - hal_espressif
     - name: mender-mcu
-      remote: mender
-      revision: main
+      remote: theyoctojester
+      revision: sdram-stage-download
       path: modules/mender-mcu
       import: true
 
