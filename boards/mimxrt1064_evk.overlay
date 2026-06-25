@@ -1,0 +1,13 @@
+/*
+ * NXP i.MX RT1064-EVK overlay for the Mender MCU integration.
+ *
+ * The in-tree board DTS sets `zephyr,random-mac-address`, so the MAC — and any
+ * MAC-derived Mender device identity — changes on every boot, causing the device
+ * to re-register as a new device each time. Pin a fixed, locally-administered MAC
+ * (first octet 0x02 = locally administered, unicast) for a stable identity.
+ */
+
+&enet_mac {
+	/delete-property/ zephyr,random-mac-address;
+	local-mac-address = [02 11 64 00 00 02];
+};
